@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Sonde KICKR · Bluefy</title>
+<style>
+  body{margin:0;padding:20px 16px 32px;font:17px/1.35 -apple-system,BlinkMacSystemFont,sans-serif;background:#071321;color:#e8f0f8}
+  h1{font-size:22px;margin:0 0 8px}
+  p{margin:0 0 14px;color:#a9bdd0}
+  button{display:block;width:100%;margin:0 0 10px;padding:16px 14px;border:0;border-radius:14px;background:#1c4f86;color:#fff;font:600 17px/1.25 -apple-system,sans-serif;text-align:left}
+  button:active{background:#163e6a}
+  #log{white-space:pre-wrap;word-break:break-word;background:#0d1c2e;border-radius:14px;padding:14px;min-height:7em;color:#d5e6f5}
+</style>
+</head>
+<body>
+<h1>Sonde Bluetooth</h1>
+<p>Page chargée. Un bouton = une seule demande. Aucune recherche au démarrage. À ouvrir dans Bluefy, pas dans Safari.</p>
+<button type="button" id="hr">1 · Cardio 0x180D</button>
+<button type="button" id="all">2 · Puissance, copie CycloLive</button>
+<button type="button" id="name">3 · Puissance, nom KICKR</button>
+<p id="log">En attente d’un bouton.</p>
+<script>
+const log = document.getElementById('log');
+const CPS = '00001818-0000-1000-8000-00805f9b34fb';
+const FTMS = '00001826-0000-1000-8000-00805f9b34fb';
+function dump(e) {
+  const kind = e === null ? 'null' : Array.isArray(e) ? 'array' : typeof e;
+  const bits = ['type=' + kind];
+  if (e == null || kind === 'string' || kind === 'number' || kind === 'boolean') {
+    bits.push(JSON.stringify(e));
+    return bits.join(' | ');
+  }
+  if (e.constructor && e.constructor.name) bits.push('ctor=' + e.constructor.name);
+  ['name','message','code','domain','description','localizedDescription','reason'].forEach(function (k) {
+    if (e[k] != null && e[k] !== '') bits.push(k + '=' + e[k]);
+  });
+  try {
+    const own = {};
+    Object.getOwnPropertyNames(e).forEach(function (k) {
+      const v = e[k];
+      if (typeof v === 'function') return;
+      own[k] = (v == null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') ? v : typeof v;
+    });
+    bits.push(JSON.stringify(own));
+  } catch (err) {
+    bits.push('props illisibles');
+  }
+  return bits.join(' | ').slice(0, 700);
+}
+function probe(label, options) {
+  return function () {
+    if (!navigator.bluetooth || !navigator.bluetooth.requestDevice) {
+      log.textContent = label + " : navigator.bluetooth.requestDevice absent. Cette page n’est pas ouverte dans Bluefy.";
+      return;
+    }
+    log.textContent = label + " : appel envoyé. Si aucune liste n’apparaît, le rejet est immédiat.";
+    navigator.bluetooth.requestDevice(options).then(function (device) {
+      log.textContent = label + ' : choisi « ' + (device.name || '(sans nom)') + ' »';
+    }, function (e) {
+      log.textContent = label + ' : ' + dump(e);
+    });
+  };
+}
+document.getElementById('hr').onclick = probe('Cardio', { filters: [{ services: [0x180d] }], optionalServices: [0x180d] });
+document.getElementById('all').onclick = probe('Copie V348', { acceptAllDevices: true, optionalServices: [0x1818, 0x1826] });
+document.getElementById('name').onclick = probe('Nom KICKR', { filters: [{ namePrefix: 'KICKR' }], optionalServices: [CPS, FTMS] });
+</script>
+</body>
+</html>
